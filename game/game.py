@@ -1,12 +1,13 @@
-# game.py - Основной класс игры Тетрис с всей игровой логикой
+# game.py - Основной класс игры Тетрис с всей игровой логикой и эффектами
 
 # Импортируем необходимые модули
-import pygame
 import sys
-import random
 from tetromino import Tetromino  # Импортируем класс тетрамино
 from constants import *  # Импортируем все константы
 from ui import UI  # Импортируем класс интерфейса
+from sound_manager import SoundManager  # Импортируем менеджер звуков
+from particle import ParticleSystem  # Импортируем систему частиц
+import pygame
 
 
 class TetrisGame:
@@ -28,6 +29,12 @@ class TetrisGame:
 
         # Создаем объект интерфейса пользователя
         self.ui = UI(self.screen, self.screen_width, self.screen_height)
+
+        # Создаем менеджер звуков
+        self.sound_manager = SoundManager()
+
+        # Создаем систему частиц
+        self.particle_system = ParticleSystem()
 
         # Инициализируем игровое состояние
         self.reset_game()  # Сбрасываем игру к начальному состоянию
@@ -102,7 +109,7 @@ class TetrisGame:
                 self.grid[y][x] = self.current_piece.color
 
     def clear_lines(self):
-        """Очистка заполненных линий"""
+        """Очистка заполненных линий с эффектами"""
         lines_to_clear = []  # Список для хранения индексов заполненных линий
 
         # Проходим по каждой строке игрового поля
@@ -112,11 +119,32 @@ class TetrisGame:
                 lines_to_clear.append(i)  # Добавляем индекс заполненной строки
 
         # Если есть заполненные строки для очистки
-        for line in lines_to_clear:
-            # Удаляем заполненную строку
-            del self.grid[line]
-            # Добавляем новую пустую строку в начало поля
-            self.grid.insert(0, [0 for _ in range(GRID_WIDTH)])
+        if lines_to_clear:
+            # Воспроизводим звук очистки линий
+            self.sound_manager.play_sound('line_clear')
+
+            # Создаем эффекты частиц для каждой очищенной линии
+            for line in lines_to_clear:
+                # Получаем цвет первой ячейки в линии для эффекта частиц
+                color = self.grid[line][0] if self.grid[line][0] else ((255, 255, 255), (200, 200, 200))
+                if isinstance(color, tuple) and len(color) == 2:
+                    main_color = color[0]
+                else:
+                    main_color = (255, 255, 255)
+
+                # Добавляем эффект частиц по центру очищенной линии
+                y_pos = self.play_area_y + line * self.grid_size + self.grid_size // 2
+                self.particle_system.add_line_clear_effect(
+                    self.play_area_x + GRID_WIDTH * self.grid_size // 2,
+                    y_pos,
+                    main_color
+                )
+
+            # Удаляем заполненные строки
+            for line in reversed(lines_to_clear):  # Удаляем с конца, чтобы не сбить индексы
+                del self.grid[line]
+                # Добавляем новую пустую строку в начало поля
+                self.grid.insert(0, [0 for _ in range(GRID_WIDTH)])
 
         # Обновление счета, если были очищены линии
         if lines_to_clear:
@@ -152,6 +180,8 @@ class TetrisGame:
 
             # Если перемещение было вниз (падение)
             if dy > 0:
+                # Воспроизводим звук падения
+                self.sound_manager.play_sound('drop')
                 # Фиксируем фигуру на игровом поле
                 self.merge_piece()
                 # Проверяем и очищаем заполненные линии
@@ -164,17 +194,31 @@ class TetrisGame:
                 if not self.valid_position():
                     # Если не может - игра окончена
                     self.game_state = "game_over"
+            else:
+                # Воспроизводим звук перемещения
+                if dx != 0:
+                    self.sound_manager.play_sound('move')
+        else:
+            # Воспроизводим звук перемещения
+            if dx != 0:
+                self.sound_manager.play_sound('move')
 
     def rotate_piece(self):
-        """Поворот текущей фигуры"""
+        """Поворот текущей фигуры с анимацией"""
         # Сохраняем оригинальную форму на случай, если поворот будет недопустим
         original_shape = self.current_piece.shape
         # Применяем поворот к фигуре
         self.current_piece.shape = self.current_piece.rotate()
+        # Начинаем анимацию поворота
+        self.current_piece.start_rotation_animation()
+        # Воспроизводим звук поворота
+        self.sound_manager.play_sound('rotate')
         # Проверяем, допустима ли новая форма
         if not self.valid_position():
             # Если недопустима, возвращаем оригинальную форму
             self.current_piece.shape = original_shape
+            # Отменяем анимацию поворота
+            self.current_piece.rotation_animation = 0
 
     def hard_drop(self):
         """Мгновенное падение фигуры вниз до первого препятствия"""
@@ -185,6 +229,8 @@ class TetrisGame:
         # Возвращаем фигуру на одну позицию вверх (последняя допустимая позиция)
         self.current_piece.y -= 1
 
+        # Воспроизводим звук падения
+        self.sound_manager.play_sound('drop')
         # Фиксируем фигуру на игровом поле
         self.merge_piece()
         # Проверяем и очищаем заполненные линии
@@ -249,25 +295,35 @@ class TetrisGame:
                     pygame.draw.rect(self.screen, shadow, rect, max(1, self.grid_size // 15))
 
     def draw_current_piece(self):
-        """Отрисовка текущей фигуры"""
+        """Отрисовка текущей фигуры с анимациями"""
+        # Обновляем анимации фигуры
+        dt = self.clock.get_time() / 1000.0  # Время в секундах
+        self.current_piece.update_animation(dt)
+
         # Рисуем текущую фигуру только во время игры или паузы
         if self.game_state == "playing" or self.game_state == "paused":
             # Получаем все позиции ячеек текущей фигуры
             for x, y in self.current_piece.get_positions():
                 # Рисуем только ячейки, которые находятся внутри игрового поля
                 if y >= 0:
-                    color, shadow = self.current_piece.color  # Получаем цвет фигуры
+                    # Вычисляем координаты для отрисовки
+                    screen_x = self.play_area_x + x * self.grid_size
+                    screen_y = self.play_area_y + y * self.grid_size
 
-                    # Создаем прямоугольник для отрисовки ячейки фигуры
-                    rect = pygame.Rect(self.play_area_x + x * self.grid_size,  # X-координата
-                                       self.play_area_y + y * self.grid_size,  # Y-координата
-                                       self.grid_size,  # Ширина
-                                       self.grid_size)  # Высота
+                    # Применяем анимацию поворота если она активна
+                    if self.current_piece.rotation_animation > 0:
+                        # Добавляем небольшое смещение для анимации поворота
+                        rotation_progress = self.current_piece.rotation_animation / 15.0
+                        screen_x += self.grid_size * 0.1 * rotation_progress
+                        screen_y += self.grid_size * 0.1 * rotation_progress
 
-                    # Рисуем основной цвет ячейки фигуры
-                    pygame.draw.rect(self.screen, color, rect)
-                    # Рисуем тень для создания 3D-эффекта
-                    pygame.draw.rect(self.screen, shadow, rect, max(1, self.grid_size // 15))
+                    # Рисуем ячейку фигуры с эффектами
+                    self.current_piece.draw_cell(
+                        self.screen,
+                        screen_x,
+                        screen_y,
+                        self.grid_size
+                    )
 
     def draw_next_piece(self):
         """Отрисовка следующей фигуры в сайдбаре"""
@@ -319,6 +375,24 @@ class TetrisGame:
                     pygame.draw.rect(self.screen, color, rect)
                     # Рисуем тень для создания 3D-эффекта
                     pygame.draw.rect(self.screen, shadow, rect, max(1, self.grid_size // 15))
+
+                    # Добавляем эффект блеска для следующей фигуры
+                    if self.grid_size > 10:
+                        shine_size = max(1, self.grid_size // 8)
+                        # Используем светлый оттенок основного цвета вместо белого
+                        shine_color = (
+                            min(255, color[0] + 50),
+                            min(255, color[1] + 50),
+                            min(255, color[2] + 50),
+                            180  # Прозрачность
+                        )
+                        # Создаем поверхность для блеска с прозрачностью
+                        shine_surface = pygame.Surface((shine_size * 2, shine_size * 2), pygame.SRCALPHA)
+                        pygame.draw.ellipse(shine_surface, shine_color,
+                                            (0, 0, shine_size * 2, shine_size * 2))
+                        self.screen.blit(shine_surface,
+                                         (start_x + x * self.grid_size + self.grid_size // 4 - shine_size // 2,
+                                          start_y + y * self.grid_size + self.grid_size // 4 - shine_size // 2))
 
     def draw_sidebar(self):
         """Отрисовка сайдбара с информацией"""
@@ -399,7 +473,6 @@ class TetrisGame:
                     elif quit_button.collidepoint(event.pos):
                         pygame.quit()  # Закрываем игру
                         sys.exit()
-                        return True  # Возвращаем True, чтобы указать, что событие обработано
 
             # Изменение размера окна
             if event.type == pygame.VIDEORESIZE:
@@ -562,6 +635,9 @@ class TetrisGame:
 
     def update(self):
         """Обновление игровой логики"""
+        # Обновляем систему частиц
+        self.particle_system.update()
+
         # Обновляем только во время активной игры
         if self.game_state == "playing":
             # Добавляем время, прошедшее с последнего обновления
@@ -590,6 +666,8 @@ class TetrisGame:
             self.draw_current_piece()  # Рисуем текущую фигуру
             self.draw_next_piece()  # Рисуем следующую фигуру
             self.draw_sidebar()  # Рисуем боковую панель
+            # Рисуем частицы
+            self.particle_system.draw(self.screen)
             pygame.display.flip()  # Обновляем экран
 
         elif self.game_state == "paused":
@@ -598,6 +676,8 @@ class TetrisGame:
             self.draw_current_piece()  # Рисуем текущую фигуру
             self.draw_next_piece()  # Рисуем следующую фигуру
             self.draw_sidebar()  # Рисуем боковую панель
+            # Рисуем частицы
+            self.particle_system.draw(self.screen)
             resume_button, menu_button = self.ui.draw_pause_menu()  # Рисуем меню паузы
             pygame.display.flip()  # Обновляем экран
             self.handle_pause_events(resume_button, menu_button)  # Обрабатываем события паузы
@@ -608,6 +688,8 @@ class TetrisGame:
             self.draw_current_piece()  # Рисуем текущую фигуру
             self.draw_next_piece()  # Рисуем следующую фигуру
             self.draw_sidebar()  # Рисуем боковую панель
+            # Рисуем частицы
+            self.particle_system.draw(self.screen)
             restart_button, menu_button = self.ui.draw_game_over(
                 self.score)  # Рисуем экран окончания игры с текущим счетом
             pygame.display.flip()  # Обновляем экран
