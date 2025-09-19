@@ -394,10 +394,12 @@ class TetrisGame:
                     if play_button.collidepoint(event.pos):
                         self.game_state = "playing"  # Переходим в игровой режим
                         self.reset_game()  # Сбрасываем игру
+                        return True  # Возвращаем True, чтобы указать, что событие обработано
                     # Проверяем, попал ли клик по кнопке "ЗАКРЫТЬ"
                     elif quit_button.collidepoint(event.pos):
                         pygame.quit()  # Закрываем игру
                         sys.exit()
+                        return True  # Возвращаем True, чтобы указать, что событие обработано
 
             # Изменение размера окна
             if event.type == pygame.VIDEORESIZE:
@@ -412,6 +414,8 @@ class TetrisGame:
                 self.ui.screen_height = self.screen_height
                 # Обновляем шрифты
                 self.ui.update_fonts()
+
+        return False  # Возвращаем False, если событие не обработано
 
     def handle_game_events(self):
         """Обработка игровых событий"""
@@ -427,19 +431,30 @@ class TetrisGame:
                 if event.key == pygame.K_ESCAPE:
                     # При нажатии ESC переходим в меню паузы
                     self.game_state = "paused"
+                    return True  # Возвращаем True, чтобы указать, что событие обработано
 
                 # Обработка управления во время игры
                 if self.game_state == "playing":
                     if event.key == pygame.K_a:
                         self.move(-1, 0)  # Движение влево
+                        return True
                     elif event.key == pygame.K_d:
                         self.move(1, 0)  # Движение вправо
+                        return True
                     elif event.key == pygame.K_s:
                         self.move(0, 1)  # Ускоренное падение вниз
+                        return True
                     elif event.key == pygame.K_w:
                         self.rotate_piece()  # Поворот фигуры
+                        return True
                     elif event.key == pygame.K_SPACE:
                         self.hard_drop()  # Мгновенное падение
+                        return True
+
+            # Нажатие кнопок мыши
+            if event.type == pygame.MOUSEBUTTONDOWN and self.game_state == "paused":
+                if event.button == 1:  # Левая кнопка мыши
+                    return True  # Возвращаем True, чтобы указать, что событие обработано
 
             # Изменение размера окна
             if event.type == pygame.VIDEORESIZE:
@@ -454,6 +469,8 @@ class TetrisGame:
                 self.ui.screen_height = self.screen_height
                 # Обновляем шрифты
                 self.ui.update_fonts()
+
+        return False  # Возвращаем False, если событие не обработано
 
     def handle_pause_events(self, resume_button, menu_button):
         """Обработка событий в меню паузы"""
@@ -469,16 +486,19 @@ class TetrisGame:
                 if event.key == pygame.K_ESCAPE:
                     # При нажатии ESC возвращаемся к игре
                     self.game_state = "playing"
+                    return True  # Возвращаем True, чтобы указать, что событие обработано
 
             # Нажатие кнопок мыши
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Левая кнопка мыши
                     # Проверяем, попал ли клик по кнопке "ПРОДОЛЖИТЬ"
                     if resume_button.collidepoint(event.pos):
-                        self.game_state = "playing"  # Возвращаемся к игрке
+                        self.game_state = "playing"  # Возвращаемся к игре
+                        return True  # Возвращаем True, чтобы указать, что событие обработано
                     # Проверяем, попал ли клик по кнопке "В МЕНЮ"
                     elif menu_button.collidepoint(event.pos):
                         self.game_state = "menu"  # Переходим в главное меню
+                        return True  # Возвращаем True, чтобы указать, что событие обработано
 
             # Изменение размера окна
             if event.type == pygame.VIDEORESIZE:
@@ -493,6 +513,8 @@ class TetrisGame:
                 self.ui.screen_height = self.screen_height
                 # Обновляем шрифты
                 self.ui.update_fonts()
+
+        return False  # Возвращаем False, если событие не обработано
 
     def handle_game_over_events(self, restart_button, menu_button):
         """Обработка событий на экране окончания игры"""
@@ -507,6 +529,7 @@ class TetrisGame:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.game_state = "menu"  # Переход в главное меню по ESC
+                    return True  # Возвращаем True, чтобы указать, что событие обработано
 
             # Нажатие кнопок мыши
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -515,9 +538,11 @@ class TetrisGame:
                     if restart_button.collidepoint(event.pos):
                         self.game_state = "playing"  # Новая игра
                         self.reset_game()  # Сброс игры
+                        return True  # Возвращаем True, чтобы указать, что событие обработано
                     # Проверяем, попал ли клик по кнопке "В МЕНЮ"
                     elif menu_button.collidepoint(event.pos):
                         self.game_state = "menu"  # Переход в главное меню
+                        return True  # Возвращаем True, чтобы указать, что событие обработано
 
             # Изменение размера окна
             if event.type == pygame.VIDEORESIZE:
@@ -532,6 +557,8 @@ class TetrisGame:
                 self.ui.screen_height = self.screen_height
                 # Обновляем шрифты
                 self.ui.update_fonts()
+
+        return False  # Возвращаем False, если событие не обработано
 
     def update(self):
         """Обновление игровой логики"""
@@ -553,7 +580,7 @@ class TetrisGame:
         # Отрисовка в зависимости от текущего состояния игры
         if self.game_state == "menu":
             # Отображаем главное меню
-            play_button, quit_button = self.ui.draw_menu()
+            play_button, quit_button = self.ui.draw_menu(self.score)
             pygame.display.flip()  # Обновляем экран
             self.handle_menu_events(play_button, quit_button)  # Обрабатываем события меню
 
@@ -581,7 +608,8 @@ class TetrisGame:
             self.draw_current_piece()  # Рисуем текущую фигуру
             self.draw_next_piece()  # Рисуем следующую фигуру
             self.draw_sidebar()  # Рисуем боковую панель
-            restart_button, menu_button = self.ui.draw_game_over()  # Рисуем экран окончания игры
+            restart_button, menu_button = self.ui.draw_game_over(
+                self.score)  # Рисуем экран окончания игры с текущим счетом
             pygame.display.flip()  # Обновляем экран
             self.handle_game_over_events(restart_button, menu_button)  # Обрабатываем события окончания игры
 

@@ -32,7 +32,7 @@ class UI:
         self.small_font = pygame.font.SysFont(None, max(10, int(self.screen_height * 0.026)))
         self.large_font = pygame.font.SysFont(None, max(24, int(self.screen_height * 0.067)))
 
-    def draw_menu(self):
+    def draw_menu(self, game_score=0):
         """Отрисовка главного меню игры"""
         # Создаем полупрозрачный оверлей для затемнения фона
         overlay = pygame.Surface((self.screen_width, self.screen_height))  # Создаем поверхность размером с экран
@@ -119,7 +119,7 @@ class UI:
 
         return resume_button, menu_button  # Возвращаем кнопки для обработки событий
 
-    def draw_game_over(self):
+    def draw_game_over(self, score):
         """Отрисовка экрана окончания игры"""
         # Создаем полупрозрачный оверлей для затемнения фона
         overlay = pygame.Surface((self.screen_width, self.screen_height))
@@ -133,8 +133,7 @@ class UI:
         self.screen.blit(game_over_text, game_over_rect)
 
         # Отрисовка счета игрока
-        # Проверяем наличие атрибута score, если его нет - используем 0
-        score_text = self.font.render(f"Счет: {self.score if hasattr(self, 'score') else 0}", True, WHITE)
+        score_text = self.font.render(f"Счет: {score}", True, WHITE)
         score_rect = score_text.get_rect(center=(self.screen_width // 2, self.screen_height // 2))
         self.screen.blit(score_text, score_rect)
 
