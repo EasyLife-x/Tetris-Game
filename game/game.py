@@ -108,6 +108,8 @@ class TetrisGame:
                 # Помещаем цвет фигуры в соответствующую ячейку игрового поля
                 self.grid[y][x] = self.current_piece.color
 
+    # Замени эту функцию в game.py на следующую:
+
     def clear_lines(self):
         """Очистка заполненных линий с эффектами"""
         lines_to_clear = []  # Список для хранения индексов заполненных линий
@@ -127,24 +129,31 @@ class TetrisGame:
             for line in lines_to_clear:
                 # Получаем цвет первой ячейки в линии для эффекта частиц
                 color = self.grid[line][0] if self.grid[line][0] else ((255, 255, 255), (200, 200, 200))
-                if isinstance(color, tuple) and len(color) == 2:
-                    main_color = color[0]
-                else:
-                    main_color = (255, 255, 255)
-
                 # Добавляем эффект частиц по центру очищенной линии
                 y_pos = self.play_area_y + line * self.grid_size + self.grid_size // 2
                 self.particle_system.add_line_clear_effect(
                     self.play_area_x + GRID_WIDTH * self.grid_size // 2,
                     y_pos,
-                    main_color
+                    color
                 )
 
-            # Удаляем заполненные строки
-            for line in reversed(lines_to_clear):  # Удаляем с конца, чтобы не сбить индексы
-                del self.grid[line]
-                # Добавляем новую пустую строку в начало поля
-                self.grid.insert(0, [0 for _ in range(GRID_WIDTH)])
+            # Создаем новую сетку без заполненных линий
+            new_grid = []
+            cleared_count = 0
+
+            # Подсчитываем количество очищенных линий
+            cleared_count = len(lines_to_clear)
+
+            # Добавляем пустые строки сверху (количество равно числу очищенных линий)
+            for _ in range(cleared_count):
+                new_grid.append([0 for _ in range(GRID_WIDTH)])
+
+            # Добавляем неочищенные строки
+            for i, row in enumerate(self.grid):
+                if i not in lines_to_clear:
+                    new_grid.append(row)
+
+            self.grid = new_grid
 
         # Обновление счета, если были очищены линии
         if lines_to_clear:
